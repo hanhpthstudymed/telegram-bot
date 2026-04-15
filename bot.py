@@ -1,8 +1,20 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+import os
 
-# số dư (tạm thời - sẽ mất khi tắt bot)
+TOKEN = os.getenv("TOKEN")
+
 balance = 0
+
+
+# format tiền: 25000000 -> 25.000.000
+def format_money(x):
+    return format(int(x), ",").replace(",", ".")
+
+
+# chuyển "590.000" -> 590000
+def parse_money(text):
+    return float(text.replace(".", "").replace(",", "").strip())
 
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -10,39 +22,50 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
     try:
-        # cộng tiền
-        if text.startswith("+"):
-            amount = float(text.replace("+", "").strip())
+        # 👉 chỉ lấy dòng đầu tiên
+        first_line = text.split("\n")[0].strip()
+
+        # ➕ cộng tiền
+        if first_line.startswith("+"):
+            amount_str = first_line.replace("+", "").strip()
+            amount = parse_money(amount_str)
+
             balance += amount
-            await update.message.reply_text(f"➕ +{amount}\n💰 Số dư: {balance}")
+            await update.message.reply_text(
+                f"➕ +{format_money(amount)}\n💰 Số dư: {format_money(balance)}"
+            )
 
-        # trừ tiền
-        elif text.startswith("-"):
-            amount = float(text.replace("-", "").strip())
+        # ➖ trừ tiền
+        elif first_line.startswith("-"):
+            amount_str = first_line.replace("-", "").strip()
+            amount = parse_money(amount_str)
+
             balance -= amount
-            await update.message.reply_text(f"➖ -{amount}\n💰 Số dư: {balance}")
+            await update.message.reply_text(
+                f"➖ -{format_money(amount)}\n💰 Số dư: {format_money(balance)}"
+            )
 
-        # reset số dư
-        elif text.startswith("#dcsd"):
-            parts = text.split()
+        # 🔄 reset số dư
+        elif first_line.startswith("#dcsd"):
+            parts = first_line.split()
             if len(parts) == 2:
-                balance = float(parts[1])
-                await update.message.reply_text(f"🔄 Reset số dư: {balance}")
+                balance = parse_money(parts[1])
+                await update.message.reply_text(
+                    f"🔄 Reset số dư: {format_money(balance)}"
+                )
             else:
-                await update.message.reply_text("❌ Sai cú pháp. Dùng: #dcsd 100")
+                await update.message.reply_text("❌ Dùng đúng: #dcsd 100")
 
         else:
-            await update.message.reply_text("❓ Cú pháp:\n+50\n-20\n#dcsd 100")
+            await update.message.reply_text(
+                "❓ Cú pháp:\n+ 500000\n- 200000\n#dcsd 100000"
+            )
 
-    except ValueError:
-        await update.message.reply_text("❌ Số tiền không hợp lệ")
+    except:
+        await update.message.reply_text("❌ Sai định dạng tiền")
 
-
-# 🔑 DÁN TOKEN CỦA BẠN VÀO ĐÂY
-TOKEN = "8503547183:AAHtm7F6b71dE6LxH-gn4XHUK-ZERDJrpN0"
 
 app = ApplicationBuilder().token(TOKEN).build()
-
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 print("🤖 Bot đang chạy...")
